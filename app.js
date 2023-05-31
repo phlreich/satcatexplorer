@@ -42,7 +42,8 @@ fetch('data/satcat.csv')
         let filteredData = results.data.filter(row => 
             row['ORBIT_TYPE'] === 'ORB'&&
             row['OBJECT_TYPE'] === 'PAY' &&
-            row['ORBIT_CENTER'] === 'EA').slice(0,1);
+            row['ORBIT_CENTER'] === 'EA' &&
+            row['OBJECT_NAME'].includes('MMS 1') === true);
 
         filteredData.forEach(row => {
             fetch(`https://celestrak.com/NORAD/elements/gp.php?CATNR=${row['NORAD_CAT_ID']}&FORMAT=CSV`)
@@ -64,7 +65,8 @@ fetch('data/satcat.csv')
                     let ellipse = new THREE.Line(geometry, material);
                     let INCLINATION = parseFloat(results.data[0]['INCLINATION']);
                     let RA_OF_ASC_NODE = parseFloat(results.data[0]['RA_OF_ASC_NODE']);
-                    ellipse.rotation.x = THREE.MathUtils.degToRad(90 - INCLINATION); // you guessed it, the axes are all messed up
+                    ellipse.rotation.x = THREE.MathUtils.degToRad(90); // you guessed it, the axes are all messed up
+                    ellipse.rotation.y = THREE.MathUtils.degToRad(INCLINATION);
                     ellipse.rotation.z = THREE.MathUtils.degToRad(RA_OF_ASC_NODE);
                     scene.add(ellipse);
                 });
@@ -77,7 +79,7 @@ const axesHelper = new THREE.AxesHelper( 5 );
 scene.add( axesHelper );
 
 const controls = new OrbitControls( camera, renderer.domElement );
-camera.position.set( 0, 3, 0 );
+camera.position.set( 2, 3, 2 );
 controls.update();
 controls.enablePan = false;
 controls.enableDamping = true;
