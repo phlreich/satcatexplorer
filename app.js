@@ -5,7 +5,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
 
-const resolution = 128;
+const resolution = 256;
 
 const renderer = new THREE.WebGLRenderer( { antialias: true } );
 renderer.setSize( window.innerWidth, window.innerHeight );
@@ -15,7 +15,7 @@ const earthradius = 1;
 const scaleFactor = earthradius / 6371;
 const geometry1 = new THREE.SphereGeometry(earthradius, resolution, resolution);
 const textureLoader = new THREE.TextureLoader();
-const texture = textureLoader.load("/8081_earthmap10k.webp");
+const texture = textureLoader.load("/2k_custom_earth_daymap.webp");
 texture.colorSpace = THREE.SRGBColorSpace; // use srgb color space
 const material1 = new THREE.MeshBasicMaterial( { map: texture } );
 const earth = new THREE.Mesh( geometry1, material1 );
@@ -34,6 +34,24 @@ function orbitShapeMaker(semiMajorAxis, semiMinorAxis) {
     );
 }
 
+function orbitMaker(mean_motion, eccentricity, INCLINATION, RA_OF_ASC_NODE) {
+    let mu = 398600.4418; // Earth's gravitational parameter, in km^3/s^2
+    let n = mean_motion * 2 * Math.PI / (24*3600); // convert from rev/day to rad/s
+    let semiMajorAxis = Math.pow(mu / (n * n), 1 / 3);
+    let semiMinorAxis = semiMajorAxis * Math.sqrt(1 - eccentricity * eccentricity);
+    let orbit = orbitShapeMaker(semiMajorAxis, semiMinorAxis);
+    let points = orbit.getPoints(resolution);
+    let geometry = new THREE.BufferGeometry().setFromPoints(points);
+    let material = new THREE.LineBasicMaterial({color: 0xff0000});
+    let ellipse = new THREE.Line(geometry, material);
+    ellipse.rotation.x = THREE.MathUtils.degToRad(90);
+    ellipse.rotation.z = THREE.MathUtils.degToRad(RA_OF_ASC_NODE);
+    ellipse.rotation.y = THREE.MathUtils.degToRad(INCLINATION);
+    return ellipse;
+}
+
+let k = 27;
+
 fetch('data/satcat.csv')
     .then(response => response.text())
     .then(data => {
@@ -42,8 +60,7 @@ fetch('data/satcat.csv')
         let filteredData = results.data.filter(row => 
             row['ORBIT_TYPE'] === 'ORB'&&
             row['OBJECT_TYPE'] === 'PAY' &&
-            row['ORBIT_CENTER'] === 'EA' &&
-            row['OBJECT_NAME'].includes('MMS 1') === true);
+            row['ORBIT_CENTER'] === 'EA').slice(k, k+1);
 
         filteredData.forEach(row => {
             fetch(`https://celestrak.com/NORAD/elements/gp.php?CATNR=${row['NORAD_CAT_ID']}&FORMAT=CSV`)
@@ -51,24 +68,12 @@ fetch('data/satcat.csv')
                 .then(data => {
                     let results = Papa.parse(data, { header: true });
                     console.log(results.data[0]);
-                    let mu = 398600.4418; // Earth's gravitational parameter, in km^3/s^2
                     let mean_motion = parseFloat(results.data[0]['MEAN_MOTION']);
-                    let n = mean_motion * 2 * Math.PI / (24*3600); // convert from rev/day to rad/s
-                    let semiMajorAxis = Math.pow(mu / (n * n), 1 / 3);
                     let eccentricity = parseFloat(results.data[0]['ECCENTRICITY']);
-                    let semiMinorAxis = semiMajorAxis * Math.sqrt(1 - eccentricity * eccentricity);
-                    let ARG_OF_PERICENTER = parseFloat(results.data[0]['ARG_OF_PERICENTER']);
-                    let orbit = orbitShapeMaker(semiMajorAxis, semiMinorAxis);
-                    let points = orbit.getPoints(resolution);
-                    let geometry = new THREE.BufferGeometry().setFromPoints(points);
-                    let material = new THREE.LineBasicMaterial({color: 0xff0000});
-                    let ellipse = new THREE.Line(geometry, material);
                     let INCLINATION = parseFloat(results.data[0]['INCLINATION']);
                     let RA_OF_ASC_NODE = parseFloat(results.data[0]['RA_OF_ASC_NODE']);
-                    ellipse.rotation.x = THREE.MathUtils.degToRad(90); // you guessed it, the axes are all messed up
-                    ellipse.rotation.y = THREE.MathUtils.degToRad(INCLINATION);
-                    ellipse.rotation.z = THREE.MathUtils.degToRad(RA_OF_ASC_NODE);
-                    scene.add(ellipse);
+                    let orbit = orbitMaker(mean_motion, eccentricity, INCLINATION, RA_OF_ASC_NODE);
+                    scene.add(orbit);
                 });
         });
 });
