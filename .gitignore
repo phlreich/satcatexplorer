@@ -6,4 +6,4 @@ data/
 .DS_Store
 npm-debug.log
 .vscode/
-
+config.json

@@ -1,10 +1,9 @@
 import * as THREE from "three";
-import * as Papa from "papaparse";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
-const resolution = 256;
+const resolution = 128;
 
 const renderer = new THREE.WebGLRenderer( { antialias: true } );
 renderer.setSize( window.innerWidth, window.innerHeight );
@@ -61,71 +60,70 @@ function orbitMaker(mean_motion, eccentricity, INCLINATION, RA_OF_ASC_NODE) {
 }
 
 function drawOrbitFromData(results) {
-    let mean_motion = parseFloat(results['MEAN_MOTION']);
-    let eccentricity = parseFloat(results['ECCENTRICITY']);
-    let INCLINATION = parseFloat(results['INCLINATION']);
-    let RA_OF_ASC_NODE = parseFloat(results['RA_OF_ASC_NODE']);
+    let mean_motion = parseFloat(results['mean_motion']);
+    let eccentricity = parseFloat(results['eccentricity']);
+    let INCLINATION = parseFloat(results['inclination']);
+    let RA_OF_ASC_NODE = parseFloat(results['ra_of_asc_node']);
     let orbit = orbitMaker(mean_motion, eccentricity, INCLINATION, RA_OF_ASC_NODE);
     scene.add(orbit);
 }
 
+// add a text input field in the upper left corner
+let input = document.createElement("input");
+input.type = "text";
+input.style.position = "absolute";
+input.style.top = "10px";
+input.style.left = "10px";
+input.style.width = "200px";
+input.style.height = "20px";
+input.style.fontSize = "16px";
+input.style.zIndex = "1";
+document.body.appendChild(input);
 
-let activeData = [];
-let satcatData = [];
+// add a button next to the text input field
+let button = document.createElement("button");
+button.innerHTML = "Search";
+button.style.position = "absolute";
+button.style.top = "10px";
+button.style.left = "220px";
+button.style.width = "100px";
+button.style.height = "20px";
+button.style.fontSize = "16px";
+button.style.zIndex = "1";
+document.body.appendChild(button);
 
-function parseCSVData(url) {
-    return new Promise((resolve, reject) => {
-        Papa.parse(url, {
-            download: true,
-            header: true,
-            complete: function(results) {
-                resolve(results.data);
-            },
-            error: function(err) {
-                reject(err);
-            }
-        });
-    });
-}
 
-async function updateData() {
-    try {
-        activeData = await parseCSVData("https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=csv");
-        satcatData = await parseCSVData("https://celestrak.com/pub/satcat.csv");
-    } catch (err) {
-        console.error(err);
-    }
-}
-
-async function readDataFromDisk() {
-    try {
-        activeData = await parseCSVData("data/active.csv");
-        satcatData = await parseCSVData("data/satcat.csv");
-    } catch (err) {
-        console.error(err);
-    }
-    satcatData = satcatData.filter(item => {
-        return activeData.find(activeItem => activeItem.NORAD_CAT_ID === item.NORAD_CAT_ID);
-    }
-    );
-}
-
-function filterDataAndDraw() {
-    let filteredData = satcatData.filter(item => {
-        return item.OBJECT_TYPE === 'PAY' &&
-            item.OBJECT_NAME.includes('COM') &&
-            new Date(item.LAUNCH_DATE).getTime() < new Date(1999, 0, 1).getTime()
-    });
-    filteredData.forEach(item => {
-        let activeItem = activeData.find(activeItem => activeItem.NORAD_CAT_ID === item.NORAD_CAT_ID);
-        if (activeItem) {
-            drawOrbitFromData(activeItem);
+button.addEventListener("click", function() {
+    console.log(input.value);
+    // clear orbits
+    for(let i = scene.children.length - 1; i >= 0; i--){
+        let child = scene.children[i];
+        if (child.type == "Line") {
+            scene.remove(child);
         }
     }
-    );
-}
 
-readDataFromDisk().then(filterDataAndDraw).catch(err => console.error(err));
+    // update the scene
+    scene.traverse(function (node) {
+        if (node instanceof THREE.Line) {
+            node.geometry.dispose();
+            node.material.dispose();
+        }
+    });
+    // send request to server
+    fetch('http://192.168.2.127:5730/api/search?q=' + encodeURIComponent(input.value))
+    .then(response => response.json())
+    .then(data => {
+        data.forEach(drawOrbitFromData);
+    });
+});
+
+input.addEventListener("keyup", function(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        button.click();
+    }
+});
 
 function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -134,7 +132,7 @@ function onWindowResize() {
 }
 
 function animate() {
-    earth.rotation.y += 0.0005;
+    earth.rotation.y += 0.0001;
 	requestAnimationFrame( animate );
     let distance = camera.position.length();
     controls.rotateSpeed = distance * 0.3;
