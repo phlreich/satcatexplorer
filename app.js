@@ -20,7 +20,7 @@ const earth = new THREE.Mesh( geometry1, material1 );
 scene.add( earth );
 
 const controls = new OrbitControls( camera, renderer.domElement );
-camera.position.set( .3, 4, 4 );
+camera.position.set( .3, 2, 2 );
 controls.update();
 controls.enablePan = false;
 controls.enableDamping = true;
@@ -68,30 +68,63 @@ function drawOrbitFromData(results) {
     scene.add(orbit);
 }
 
-// add a text input field in the upper left corner
+// create a container for the input field and button
+let container = document.createElement("div");
+container.className = "search-container";
+document.body.appendChild(container);
+
+// add a text input field in the container
 let input = document.createElement("input");
 input.type = "text";
-input.style.position = "absolute";
-input.style.top = "10px";
-input.style.left = "10px";
-input.style.width = "200px";
-input.style.height = "20px";
-input.style.fontSize = "16px";
-input.style.zIndex = "1";
-document.body.appendChild(input);
+input.className = "input-field";
+container.appendChild(input);
 
 // add a button next to the text input field
 let button = document.createElement("button");
-button.innerHTML = "Search";
-button.style.position = "absolute";
-button.style.top = "10px";
-button.style.left = "220px";
-button.style.width = "100px";
-button.style.height = "20px";
-button.style.fontSize = "16px";
-button.style.zIndex = "1";
-document.body.appendChild(button);
+button.innerHTML = "✈";  // Unicode for paper airplane
+button.className = "button-search";
+container.appendChild(button);
 
+// function to expand container
+function expandContainer() {
+  container.style.width = "400px";
+}
+
+// dynamically adjust container width when the input field is focused or unfocused
+input.addEventListener('focus', expandContainer);
+input.addEventListener('blur', function() {
+  if (input.value === "") {
+    container.style.width = "200px";
+  }
+});
+
+// simulate typing text
+let demoText = "Computer! Show me the ten oldest satellites.";
+let textIndex = 0;
+
+function typeText() {
+  if (textIndex < demoText.length) {
+    // expand the container and show the button when the first character is typed
+    button.disabled = true;
+    input.disabled = true;
+    if (textIndex === 17) {
+      expandContainer();
+      button.style.visibility = "visible";
+    }
+    
+    input.value += demoText.charAt(textIndex);
+    textIndex++;
+    setTimeout(typeText, 80);  // adjust the delay as needed
+  } else {
+    button.disabled = false;
+    input.disabled = false;
+    // wait for 2 seconds and then click the button
+    setTimeout(function() {
+        button.click();
+        }
+    , 1300);
+  }
+}
 
 button.addEventListener("click", function() {
     console.log(input.value);
@@ -116,6 +149,9 @@ button.addEventListener("click", function() {
     .then(data => {
         data.forEach(drawOrbitFromData);
     });
+    input.value = "";
+    container.style.width = "200px";
+    button.style.visibility = "hidden";
 });
 
 input.addEventListener("keyup", function(event) {
@@ -142,3 +178,6 @@ function animate() {
 }
 
 animate();
+
+// type the demo text after a delay
+setTimeout(typeText, 100);  // adjust the delay as needed
