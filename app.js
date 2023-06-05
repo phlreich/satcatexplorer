@@ -127,7 +127,6 @@ function typeText() {
 }
 
 button.addEventListener("click", function() {
-    console.log(input.value);
     // clear orbits
     for(let i = scene.children.length - 1; i >= 0; i--){
         let child = scene.children[i];
@@ -180,4 +179,4 @@ function animate() {
 animate();
 
 // type the demo text after a delay
-setTimeout(typeText, 100);  // adjust the delay as needed
+setTimeout(typeText, 2000);

@@ -41,11 +41,11 @@ CREATE TABLE public.satcatdata_viable (
     orbit_type character varying(10)
 );
 
-Your answers get piped directly into the postgres database, with the data needed coming from the orbitdata table (the other table helping you with fetching the right data), therefore we all expect you to answer like this:
+Your answers get piped directly into the postgres database, with the data needed being just the norad_cat_id (you may use both or either table for your query), therefore we all expect you to answer like this:
 
 User: Computer! Get me the ten oldest satellites.
 
-QueryGPT: SELECT * FROM public.orbitdata o JOIN public.satcatdata_viable s ON o.norad_cat_id = s.norad_cat_id ORDER BY s.launch_date ASC LIMIT 10;
+QueryGPT: SELECT norad_cat_id FROM satcatdata_viable ORDER BY launch_date ASC LIMIT 10;
 
 User: ($1)
 
