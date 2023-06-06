@@ -4,56 +4,62 @@
 		<meta charset="utf-8">
 		<title>Earth</title>
 		<style>
-		body { margin: 0; }
-		
-		.search-container {
-		  position: absolute;
-		  top: 10px;
-		  left: 10px;
-		  display: flex;
-		  align-items: center;
-		  width: 200px;
-		  height: 40px;
-		  background-color: rgba(255, 255, 255, 0.1);
-		  border-radius: 20px;
-		  transition: width 0.2s ease-in-out;
-		  z-index: 1;
-		}
+			body { 
+			  	margin: 0; 
+			  	font-size: 16px;  /* added for relative rem calculation */
+			}
 
-		.input-field {
-		  width: 100%;
-		  height: 100%;
-		  padding: 10px;
-		  font-size: 16px;
-		  color: white;
-		  background: none;
-		  border: none;
-		  outline: none;
-		}
+			.search-container {
+				position: fixed;
+  				bottom: 105px;
+  				left: 50%;
+  				transform: translateX(-50%);
+			  	display: flex;
+			  	align-items: center;
+			  	width: 200px;
+			  	height: 3rem; /* increased height */
+			  	background-color: rgba(255, 255, 255, 0.8); /* more contrast */
+			  	border-radius: 20px;
+			  	box-shadow: 0 0 10px 3px rgba(255, 255, 255, 0.5); /* glow effect */
+			  	transition: width 0.2s ease-in-out, box-shadow 0.2s ease-in-out; /* added transition for glow effect */
+			  	z-index: 1;
+			}
 
-		.input-field:focus + .button-search {
-		  visibility: visible;
-		}
+			.input-field {
+			  	width: 100%;
+			  	height: 100%;
+			  	padding: 10px;
+			  	font-size: 1rem; /* larger font size */
+			  	color: black; /* more contrast */
+			  	background: none;
+			  	border: none;
+			  	outline: none;
+			}
 
-		.button-search {
-		  display: flex;
-		  align-items: center;
-		  justify-content: center;
-		  width: 40px;
-		  height: 100%;
-		  background-color: rgba(255, 255, 255, 0.2);
-		  color: white;
-		  border: none;
-		  border-radius: 0 20px 20px 0;
-		  cursor: pointer;
-		  transition: visibility 0.2s ease-in-out;
-		  visibility: hidden;
-		  z-index: 1;
-		}
+			.input-field:focus + .button-search {
+			  	visibility: visible;
+			}
 
-		.button-search:hover {
-		  background-color: rgba(255, 255, 255, 0.3);
-		}
+			.button-search {
+			  	display: flex;
+			  	align-items: center;
+			  	justify-content: center;
+			  	width: 60px; /* increased width */
+			  	height: 100%;
+			  	background-color: rgba(255, 255, 255, 0.2);
+			  	color: black; /* more contrast */
+			  	border: none;
+			  	border-radius: 0 20px 20px 0;
+			  	cursor: pointer;
+			  	transition: visibility 0.2s ease-in-out;
+			  	visibility: hidden;
+			  	z-index: 1;
+			}
+
+			.button-search:hover {
+			  	background-color: rgba(255, 255, 255, 0.3);
+	}		
+
 
 		</style>
 	</head>

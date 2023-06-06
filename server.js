@@ -1,17 +1,15 @@
 import express from 'express';
-import axios from 'axios';
 import fs from 'fs';
-import csv from 'csv-parser';
+import Papa from 'papaparse';
 import cron from 'node-cron';
-import pkg from 'pg';
-import stream from 'stream';
+import pg from 'pg';
 import cors from 'cors';
-import { Configuration, OpenAIApi } from "openai";
-import { promisify } from 'util';
+import nsp from 'node-sql-parser';
+const { Parser } = nsp;
 
-import { fetchDataForNoradId } from './helpers.js';
+import { fetchDataForNoradId, fetchGPTResponse } from './helpers.js';
 
-const { Pool } = pkg;
+const { Pool } = pg;
 const app = express();
 
 app.get('/', (req, res) => {
@@ -29,14 +27,6 @@ app.use(cors());
 
 const config = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
 
-
-const configuration = new Configuration({
-    organization: "org-3tbowCdIMm2qTGyOmB0BSLze",
-    apiKey: config.GPT_API.OPENAI_API_KEY,
-});
-
-const openai = new OpenAIApi(configuration);
-
 const pool = new Pool({
     user: config.db.user,
     host: config.db.host,
@@ -44,6 +34,7 @@ const pool = new Pool({
     password: config.db.password,
     port: config.db.port,
 });
+
 
 // test connection
 pool.query('SELECT NOW()', (error, results) => {
@@ -55,29 +46,14 @@ pool.query('SELECT NOW()', (error, results) => {
 
 // cron job to update satcat data every day at midnight
 cron.schedule('0 0 * * *', async () => {
+    console.log('attempting to update satcatdata', new Date());
     try {
-        const response = await axios.get('https://celestrak.com/pub/satcat.csv');
-        const csvData = response.data;
-        const results = [];
+        const response = await fetch('https://celestrak.com/pub/satcat.csv');
+        const csvData = await response.text();
+        const parsedData = Papa.parse(csvData, { header: true }).data.slice(0, -1);
 
-        const pipeline = promisify(stream.pipeline);
-        const readableStream = stream.Readable.from(csvData);
-
-        await pipeline(
-            readableStream,
-            csv(),
-            new stream.Writable({
-                objectMode: true,
-                write(obj, _, callback) {
-                    results.push(obj);
-                    callback();
-                },
-            })
-        );
-        
-        await pool.query('BEGIN');
         await pool.query('TRUNCATE TABLE satcatdata');
-        for (let row of results) {
+        for (let row of parsedData) {
             let values = Object.values(row).map(value => value === '' ? null : value);
             await pool.query(
                 `INSERT INTO satcatdata (
@@ -87,17 +63,22 @@ cron.schedule('0 0 * * *', async () => {
                 values
             );
         }
-        await pool.query('COMMIT');
-        console.log('satcatdata updated');
+        console.log('satcatdata updated', new Date());
     } catch (err) {
-        await pool.query('ROLLBACK');
         console.error(err);
     }
 });
 
+
 cron.schedule('0 0 * * *', async () => {
+    // keep the orbitdata table up to date
     try {
-        const sqlQuery = "select * from satcatdata_viable where norad_cat_id not in (select norad_cat_id from orbitdata) and norad_cat_id not in (select norad_cat_id from no_gp) limit 1000";
+        const sqlQuery = "SELECT * FROM satcatdata_viable \
+        WHERE norad_cat_id NOT IN \
+        (SELECT norad_cat_id FROM orbitdata) \
+        AND norad_cat_id NOT IN \
+        (SELECT norad_cat_id FROM no_gp) \
+        LIMIT 1000";
         const result = await pool.query(sqlQuery);
         const norad_ids = result.rows.map(row => row.norad_cat_id);
         await fetchDataForNoradId(norad_ids, pool);
@@ -107,28 +88,34 @@ cron.schedule('0 0 * * *', async () => {
     }
 });
 
-
+const parser = new Parser();
 app.get('/api/search', async (req, res) => {
     try {
-        // const sqlQuery = req.query.q;
-        const sqlQuery = "SELECT * FROM satcatdata_viable ORDER BY launch_date ASC LIMIT 10;";
-        const result = await pool.query(sqlQuery);
-        const norad_ids = result.rows.map(row => row.norad_cat_id);
-
-        const orbitDataQuery = 'SELECT * FROM orbitdata WHERE norad_cat_id = ANY($1)';
-        const orbitDataResult = await pool.query(orbitDataQuery, [norad_ids]);
-        const orbitDataNoradIds = orbitDataResult.rows.map(row => row.norad_cat_id);
-
-        const missingNoradIds = norad_ids.filter(id => !orbitDataNoradIds.includes(id));
-
-        // TODO the missing data is fetched but the orbits will not be drawn
-        if (missingNoradIds.length > 0) {
-            console.log(`Missing orbit data for ${missingNoradIds.length} objects. Fetching data from celestrak...`);
-            await fetchDataForNoradId(missingNoradIds, pool);
+        const answer = await fetchGPTResponse(req.query.q);
+        // const answer = "SELECT * FROM satcatdata_viable ORDER BY launch_date ASC LIMIT 10";
+        console.log(answer);
+        let result;
+        try {
+            parser.parse(answer);
+            result = await pool.query(answer);
+            const norad_ids = result.rows.map(row => row.norad_cat_id);
+            const orbitDataQuery = 'SELECT * FROM orbitdata WHERE norad_cat_id = ANY($1)';
+            const orbitDataResult = await pool.query(orbitDataQuery, [norad_ids]);
+            const orbitDataNoradIds = orbitDataResult.rows.map(row => row.norad_cat_id);
+            const missingNoradIds = norad_ids.filter(id => !orbitDataNoradIds.includes(id));
+    
+            // TODO the missing data is fetched but the orbits will not be drawn
+            if (missingNoradIds.length > 0) {
+                console.log(`Missing orbit data for ${missingNoradIds.length} objects. Fetching data from celestrak...`);
+                await fetchDataForNoradId(missingNoradIds, pool);
+            }
+    
+            const finalOrbitDataResult = await pool.query(orbitDataQuery, [norad_ids]);
+            res.json(finalOrbitDataResult.rows);
+        } catch (err) {
+            console.log(err);
         }
-
-        const finalOrbitDataResult = await pool.query(orbitDataQuery, [norad_ids]);
-        res.json(finalOrbitDataResult.rows);
+    
     } catch (err) {
         console.error(err);
         res.status(500).send('Server error');

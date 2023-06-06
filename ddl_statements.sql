@@ -21,7 +21,19 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: no_gp; Type: TABLE; Schema: public; Owner: postgres
+-- Name: country_lookup; Type: TABLE; Schema: public; Owner: satcatmaster
+--
+
+CREATE TABLE public.country_lookup (
+    owner character varying(255),
+    country_or_org character varying(255)
+);
+
+
+ALTER TABLE public.country_lookup OWNER TO satcatmaster;
+
+--
+-- Name: no_gp; Type: TABLE; Schema: public; Owner: satcatmaster
 --
 
 CREATE TABLE public.no_gp (
@@ -30,7 +42,7 @@ CREATE TABLE public.no_gp (
 );
 
 
-ALTER TABLE public.no_gp OWNER TO postgres;
+ALTER TABLE public.no_gp OWNER TO satcatmaster;
 
 --
 -- Name: orbitdata; Type: TABLE; Schema: public; Owner: satcatmaster
@@ -88,6 +100,37 @@ CREATE TABLE public.satcatdata (
 ALTER TABLE public.satcatdata OWNER TO satcatmaster;
 
 --
+-- Name: satcat_orbitdata; Type: VIEW; Schema: public; Owner: satcatmaster
+--
+
+CREATE VIEW public.satcat_orbitdata AS
+ SELECT satcatdata.object_name AS satcat_object_name,
+    satcatdata.norad_cat_id,
+    satcatdata.object_type,
+    country_lookup.country_or_org AS owner,
+    satcatdata.launch_date,
+    satcatdata.launch_site,
+    satcatdata.period,
+    satcatdata.apogee,
+    satcatdata.perigee,
+    satcatdata.rcs,
+    orbitdata.epoch,
+    orbitdata.mean_motion,
+    orbitdata.eccentricity,
+    orbitdata.inclination,
+    orbitdata.ra_of_asc_node,
+    orbitdata.arg_of_pericenter,
+    orbitdata.mean_anomaly,
+    orbitdata.rev_at_epoch,
+    orbitdata.bstar
+   FROM ((public.satcatdata
+     JOIN public.orbitdata ON ((satcatdata.norad_cat_id = orbitdata.norad_cat_id)))
+     LEFT JOIN public.country_lookup ON (((satcatdata.owner)::text = (country_lookup.owner)::text)));
+
+
+ALTER TABLE public.satcat_orbitdata OWNER TO satcatmaster;
+
+--
 -- Name: satcatdata_viable; Type: VIEW; Schema: public; Owner: satcatmaster
 --
 
@@ -118,7 +161,7 @@ CREATE VIEW public.satcatdata_viable AS
 ALTER TABLE public.satcatdata_viable OWNER TO satcatmaster;
 
 --
--- Name: no_gp no_gp_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: no_gp no_gp_pkey; Type: CONSTRAINT; Schema: public; Owner: satcatmaster
 --
 
 ALTER TABLE ONLY public.no_gp
@@ -149,11 +192,10 @@ GRANT ALL ON SCHEMA public TO satcatmaster;
 
 
 --
--- Name: TABLE no_gp; Type: ACL; Schema: public; Owner: postgres
+-- Name: TABLE no_gp; Type: ACL; Schema: public; Owner: satcatmaster
 --
 
 GRANT SELECT ON TABLE public.no_gp TO satcatuser;
-GRANT ALL ON TABLE public.no_gp TO satcatmaster;
 
 
 --

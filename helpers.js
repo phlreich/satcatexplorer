@@ -1,5 +1,7 @@
-export { fetchDataForNoradId };
+export { fetchDataForNoradId, fetchGPTResponse };
 import Papa from 'papaparse';
+import { Configuration, OpenAIApi } from "openai";
+import fs from 'fs';
 
 async function fetchDataForNoradId (norad_ids, pool) {
     for (const id of norad_ids) {
@@ -20,4 +22,25 @@ async function fetchDataForNoradId (norad_ids, pool) {
         const values = Object.values(csvData);
         await pool.query(query, values);
     }
+}
+
+const config = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
+const configuration = new Configuration({
+    organization: "org-3tbowCdIMm2qTGyOmB0BSLze",
+    apiKey: config.GPT_API.OPENAI_API_KEY,
+});
+const openai = new OpenAIApi(configuration);
+
+// TODO change this to only inject the prompt once
+// TODO implement model feedback if the query fails
+async function fetchGPTResponse(query) {
+    const prompt = fs.readFileSync('./prompt.txt', 'utf8');
+    let apiquery = prompt + query + "\n\nQueryGPT: ";
+    const gptResponse = await openai.createChatCompletion({
+        "model": "gpt-4",
+        "messages": [{"role": "user", "content": apiquery}]
+    }
+    );
+    const answer = gptResponse.data.choices[0].message.content;
+    return answer;
 }

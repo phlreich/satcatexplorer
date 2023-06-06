@@ -9,16 +9,6 @@ const renderer = new THREE.WebGLRenderer( { antialias: true } );
 renderer.setSize( window.innerWidth, window.innerHeight );
 document.body.appendChild( renderer.domElement );
 
-const earthradius = 1;
-const scaleFactor = earthradius / 6371;
-const geometry1 = new THREE.SphereGeometry(earthradius, resolution, resolution);
-const textureLoader = new THREE.TextureLoader();
-const texture = textureLoader.load("/8081_earthmap10k.webp");
-texture.colorSpace = THREE.SRGBColorSpace; // use srgb color space
-const material1 = new THREE.MeshBasicMaterial( { map: texture } );
-const earth = new THREE.Mesh( geometry1, material1 );
-scene.add( earth );
-
 const controls = new OrbitControls( camera, renderer.domElement );
 camera.position.set( .3, 2, 2 );
 controls.update();
@@ -27,6 +17,55 @@ controls.enableDamping = true;
 controls.zoomSpeed = 1;
 controls.maxDistance = 100;
 controls.minDistance = 1.2;
+
+const earthradius = 1;
+const scaleFactor = earthradius / 6371;
+const geometry1 = new THREE.SphereGeometry(earthradius, resolution, resolution);
+const textureLoader = new THREE.TextureLoader();
+const earth_texture = textureLoader.load("/8081_earthmap10k.webp");
+earth_texture.colorSpace = THREE.SRGBColorSpace; // use srgb color space
+const material1 = new THREE.MeshBasicMaterial( { map: earth_texture } );
+const earth = new THREE.Mesh( geometry1, material1 );
+scene.add( earth );
+
+// add the moon
+const geometry2 = new THREE.SphereGeometry(1737.4 * scaleFactor, resolution, resolution);
+const moon_texture = textureLoader.load("/lroc_color_poles_4k.webp");
+moon_texture.colorSpace = THREE.SRGBColorSpace; // use srgb color space
+const material2 = new THREE.MeshBasicMaterial( { map: moon_texture } );
+const moon = new THREE.Mesh( geometry2, material2 );
+moon.position.set(362600 * scaleFactor, 0, 0);
+scene.add( moon );
+
+// add button to switch the camera to the moon
+const button2 = document.createElement('button');
+button2.innerHTML = 'Switch to moon';
+button2.style.position = 'absolute';
+button2.style.top = '10px';
+button2.style.left = '10px';
+button2.style.zIndex = 1;
+button2.onclick = () => {
+    const cameraDistance = camera.position.distanceTo(controls.target);
+    const cameraDirection = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+    let minDistance;
+
+    if (controls.target.x === 0) {
+        controls.target.set(362600 * scaleFactor, 0, 0);
+        button2.innerHTML = 'Switch to earth';
+        minDistance = 1.2; // Update with your preferred minimum distance for earth
+    } else {
+        controls.target.set(0, 0, 0);
+        button2.innerHTML = 'Switch to moon';
+        minDistance = 0.3; // Update with your preferred minimum distance for moon
+    }
+
+    // Update camera position to keep same distance and direction
+    camera.position.copy(cameraDirection.multiplyScalar(cameraDistance).add(controls.target));
+};
+
+
+document.body.appendChild(button2);
+
 
 function orbitShapeMaker(semiMajorAxis, semiMinorAxis) {
     semiMajorAxis *= scaleFactor;
@@ -40,7 +79,11 @@ function orbitShapeMaker(semiMajorAxis, semiMinorAxis) {
     );
 }
 
-function orbitMaker(mean_motion, eccentricity, INCLINATION, RA_OF_ASC_NODE) {
+function drawOrbitFromData(results) {
+    let mean_motion = parseFloat(results['mean_motion']);
+    let eccentricity = parseFloat(results['eccentricity']);
+    let INCLINATION = parseFloat(results['inclination']);
+    let RA_OF_ASC_NODE = parseFloat(results['ra_of_asc_node']);
     let mu = 398600.4418; // Earth's gravitational parameter, in km^3/s^2
     let n = mean_motion * 2 * Math.PI / (24*3600); // convert from rev/day to rad/s
     let semiMajorAxis = Math.pow(mu / (n * n), 1 / 3);
@@ -48,7 +91,9 @@ function orbitMaker(mean_motion, eccentricity, INCLINATION, RA_OF_ASC_NODE) {
     let orbit = orbitShapeMaker(semiMajorAxis, semiMinorAxis);
     let points = orbit.getPoints(resolution);
     let geometry = new THREE.BufferGeometry().setFromPoints(points);
-    let material = new THREE.LineBasicMaterial({color: 0xff0000});
+    // see if field color exists when not make it red
+    let color = results['color'] ? results['color'] : 0xff0000;
+    let material = new THREE.LineBasicMaterial({color: color});
     let ellipse = new THREE.Line(geometry, material);
     let x = THREE.MathUtils.degToRad(90);
     let y = THREE.MathUtils.degToRad(RA_OF_ASC_NODE);
@@ -56,17 +101,9 @@ function orbitMaker(mean_motion, eccentricity, INCLINATION, RA_OF_ASC_NODE) {
     ellipse.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), x); // rotation order is important
     ellipse.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), z);
     ellipse.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), y);
-    return ellipse;
+    scene.add(ellipse);
 }
 
-function drawOrbitFromData(results) {
-    let mean_motion = parseFloat(results['mean_motion']);
-    let eccentricity = parseFloat(results['eccentricity']);
-    let INCLINATION = parseFloat(results['inclination']);
-    let RA_OF_ASC_NODE = parseFloat(results['ra_of_asc_node']);
-    let orbit = orbitMaker(mean_motion, eccentricity, INCLINATION, RA_OF_ASC_NODE);
-    scene.add(orbit);
-}
 
 // create a container for the input field and button
 let container = document.createElement("div");
@@ -81,7 +118,6 @@ container.appendChild(input);
 
 // add a button next to the text input field
 let button = document.createElement("button");
-button.innerHTML = "✈";  // Unicode for paper airplane
 button.className = "button-search";
 container.appendChild(button);
 
@@ -109,7 +145,8 @@ function typeText() {
     input.disabled = true;
     if (textIndex === 17) {
       expandContainer();
-      button.style.visibility = "visible";
+      // nevermind button.style.visibility = "visible";
+      // TODO remove the button entirely
     }
     
     input.value += demoText.charAt(textIndex);
@@ -148,6 +185,8 @@ button.addEventListener("click", function() {
     .then(data => {
         data.forEach(drawOrbitFromData);
     });
+    // moon orbit
+    // drawOrbitFromData({'mean_motion': 1/27.322, 'eccentricity': 0.0549, 'inclination': 5.145, 'ra_of_asc_node': 0, 'color': 'blue'});
     input.value = "";
     container.style.width = "200px";
     button.style.visibility = "hidden";
@@ -169,8 +208,6 @@ function onWindowResize() {
 function animate() {
     earth.rotation.y += 0.0001;
 	requestAnimationFrame( animate );
-    let distance = camera.position.length();
-    controls.rotateSpeed = distance * 0.3;
     controls.update();
 	renderer.render( scene, camera );
     onWindowResize();
