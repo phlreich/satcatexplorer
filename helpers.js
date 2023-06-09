@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config({ path: './config.env' });
+
 export { fetchDataForNoradId, fetchGPTResponse };
 import Papa from 'papaparse';
 import { Configuration, OpenAIApi } from "openai";
@@ -24,11 +27,11 @@ async function fetchDataForNoradId (norad_ids, pool) {
     }
 }
 
-const config = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
 const configuration = new Configuration({
-    organization: "org-3tbowCdIMm2qTGyOmB0BSLze",
-    apiKey: config.GPT_API.OPENAI_API_KEY,
+    organization: process.env.OPENAI_ORG,
+    apiKey: process.env.OPENAI_API_KEY,
 });
+
 const openai = new OpenAIApi(configuration);
 
 // TODO change this to only inject the prompt once

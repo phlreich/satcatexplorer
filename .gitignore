@@ -7,3 +7,6 @@ data/
 npm-debug.log
 .vscode/
 config.json
+temp.ipynb
+dist/
+config.env

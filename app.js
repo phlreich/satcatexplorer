@@ -180,7 +180,7 @@ button.addEventListener("click", function() {
         }
     });
     // send request to server
-    fetch('http://192.168.2.127:5730/api/search?q=' + encodeURIComponent(input.value))
+    fetch('/api/search?q=' + encodeURIComponent(input.value))
     .then(response => response.json())
     .then(data => {
         data.forEach(drawOrbitFromData);
