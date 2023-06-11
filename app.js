@@ -180,7 +180,11 @@ button.addEventListener("click", function() {
         }
     });
     // send request to server
-    fetch('/api/search?q=' + encodeURIComponent(input.value))
+    let server_url = '/api/search?q=';
+    if (process.env.NODE_ENV === 'development') {
+        server_url = 'http://localhost:5730' + server_url;
+    }
+    fetch(server_url + encodeURIComponent(input.value))
     .then(response => response.json())
     .then(data => {
         data.forEach(drawOrbitFromData);
@@ -206,7 +210,7 @@ function onWindowResize() {
 }
 
 function animate() {
-    earth.rotation.y += 0.0001;
+    earth.rotation.y += 0.1001;
 	requestAnimationFrame( animate );
     controls.update();
 	renderer.render( scene, camera );

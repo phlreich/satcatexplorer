@@ -7,6 +7,7 @@ import cron from 'node-cron';
 import pg from 'pg';
 import nsp from 'node-sql-parser';
 import path from 'path';
+import cors from 'cors';
 
 const { Parser } = nsp;
 
@@ -48,9 +49,16 @@ pool.query('SELECT version()', (error, results) => {
 });
 
 const app = express();
-app.use(express.static(path.join(__dirname, 'dist')));
+let portnr = 5173;
 
-let portnr = process.env.PORT || 5173;
+if (process.env.NODE_ENV === 'development') {
+    app.use(cors());
+    portnr = 5730;
+} else {
+    app.use(express.static(path.join(__dirname, 'dist')));
+}
+
+
 app.listen(portnr, '0.0.0.0', () => {
     console.log('Server is running on port ' + portnr);
 });
