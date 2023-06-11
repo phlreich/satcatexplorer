@@ -135,7 +135,7 @@ input.addEventListener('blur', function() {
 });
 
 // simulate typing text
-let demoText = "SELECT * FROM satcatdata_viable ORDER BY launch_date ASC LIMIT 10";
+let demoText = "Computer! Display the orbital path of the ISS.";
 let textIndex = 0;
 
 function typeText() {
@@ -210,7 +210,7 @@ function onWindowResize() {
 }
 
 function animate() {
-    earth.rotation.y += 0.1001;
+    earth.rotation.y += 0.0001;
 	requestAnimationFrame( animate );
     controls.update();
 	renderer.render( scene, camera );

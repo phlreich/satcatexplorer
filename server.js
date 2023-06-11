@@ -63,18 +63,18 @@ app.listen(portnr, '0.0.0.0', () => {
     console.log('Server is running on port ' + portnr);
 });
 
-app.get('/', (req, res) => {
-    console.log(path.join(__dirname, 'dist', 'index.html'));
+app.get(['/', '/defaultsite'], (req, res) => {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
+
 
 
 const parser = new Parser();
 app.get('/api/search', async (req, res) => {
     try {
         // const answer = await fetchGPTResponse(req.query.q);
-        // const answer = SELECT * FROM satcat_orbitdata ORDER BY launch_date ASC LIMIT 10
-        const answer = req.query.q;
+        const answer = "SELECT * FROM satcat_orbitdata where satcat_object_name ilike '%ISS (ZAR%'";
+        // const answer = req.query.q;
         console.log(answer);
         let result;
         try {
