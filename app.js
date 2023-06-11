@@ -135,7 +135,7 @@ input.addEventListener('blur', function() {
 });
 
 // simulate typing text
-let demoText = "Computer! Show me the ten oldest satellites.";
+let demoText = "SELECT * FROM satcatdata_viable ORDER BY launch_date ASC LIMIT 10";
 let textIndex = 0;
 
 function typeText() {

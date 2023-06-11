@@ -14,20 +14,17 @@ import { fetchDataForNoradId, fetchGPTResponse } from './helpers.js';
 
 const { Pool } = pg;
 
-let HOST;
 let __filename;
 if (process.platform === "linux") {
     __filename = import.meta.url.substring(7);
-    HOST = "host.docker.internal"
 } else {
     __filename = import.meta.url.substring(8);
-    HOST = "localhost"
 }
 const __dirname = path.dirname(__filename);
 
 const pool = new Pool({
     user: process.env.DB_USER,
-    host: HOST,
+    host: process.env.DB_HOST,
     database: process.env.DB_DATABASE,
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT,
@@ -39,9 +36,16 @@ pool.query('SELECT NOW()', (error, results) => {
     if (error) {
         throw error;
     }
-    console.log(results.rows);
+    console.log(results.rows[0].now);
 });
 
+// get system version
+pool.query('SELECT version()', (error, results) => {
+    if (error) {
+        throw error;
+    }
+    console.log(results.rows[0].version);
+});
 
 const app = express();
 app.use(express.static(path.join(__dirname, 'dist')));
@@ -60,12 +64,12 @@ app.get('/', (req, res) => {
 const parser = new Parser();
 app.get('/api/search', async (req, res) => {
     try {
-        const answer = await fetchGPTResponse(req.query.q);
-        // const answer = "SELECT * FROM satcatdata_viable ORDER BY launch_date ASC LIMIT 10";
+        // const answer = await fetchGPTResponse(req.query.q);
+        // const answer = SELECT * FROM satcat_orbitdata ORDER BY launch_date ASC LIMIT 10
+        const answer = req.query.q;
         console.log(answer);
         let result;
         try {
-            parser.parse(answer);
             result = await pool.query(answer);
             const norad_ids = result.rows.map(row => row.norad_cat_id);
             const orbitDataQuery = 'SELECT * FROM orbitdata WHERE norad_cat_id = ANY($1)';
