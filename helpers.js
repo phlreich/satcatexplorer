@@ -6,24 +6,40 @@ import Papa from 'papaparse';
 import { Configuration, OpenAIApi } from "openai";
 import fs from 'fs';
 
-async function fetchDataForNoradId (norad_ids, pool) {
-    for (const id of norad_ids) {
-        const response = await fetch(`https://celestrak.org/NORAD/elements/gp.php?CATNR=${id}&FORMAT=csv`);
-        const text = await response.text();
-        if (text.trim() === "No GP data found") {
-            console.error(`No data found for object with NORAD CAT ID: ${id}`);
-            const query = `INSERT INTO no_gp (norad_cat_id, gp_data_available) VALUES ($1, $2)`;
-            const values = [id, false];
-            await pool.query(query, values);
-            continue;
-        }
-        const csvData = Papa.parse(text, { header: true }).data[0];
+async function fetchDataForNoradId(norad_ids, pool) {
+    try {
+        const fetchPromises = norad_ids.map(id =>
+            fetch(`https://celestrak.org/NORAD/elements/gp.php?CATNR=${id}&FORMAT=csv`)
+            .catch(error => console.error(`Failed to fetch for NORAD ID ${id}: ${error}`))
+        );
+        const responses = await Promise.all(fetchPromises);
+        const textPromises = responses.map(response => response.text());
+        const texts = await Promise.all(textPromises);
 
-        const query = `INSERT INTO orbitdata ( OBJECT_NAME, OBJECT_ID, EPOCH, MEAN_MOTION, ECCENTRICITY, INCLINATION, RA_OF_ASC_NODE, 
-                ARG_OF_PERICENTER, MEAN_ANOMALY, EPHEMERIS_TYPE, CLASSIFICATION_TYPE, NORAD_CAT_ID, ELEMENT_SET_NO, REV_AT_EPOCH, 
-                BSTAR, MEAN_MOTION_DOT, MEAN_MOTION_DDOT) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`;
-        const values = Object.values(csvData);
-        await pool.query(query, values);
+        const queryPromises = texts.map(async (text, index) => {
+            const id = norad_ids[index];
+            if (text.trim() === "No GP data found") {
+                console.error(`No data found for object with NORAD CAT ID: ${id}`);
+                const query = `INSERT INTO no_gp (norad_cat_id, gp_data_available) VALUES ($1, $2)`;
+                const values = [id, false];
+                return pool.query(query, values);
+            }
+            const csvData = Papa.parse(text, { header: true }).data[0];
+            const query = `INSERT INTO orbitdata (object_name, object_id, epoch, mean_motion, eccentricity, inclination, ra_of_asc_node, 
+                    arg_of_pericenter, mean_anomaly, ephemeris_type, classification_type, norad_cat_id, element_set_no, rev_at_epoch, 
+                    bstar, mean_motion_dot, mean_motion_ddot) 
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) 
+                ON CONFLICT (norad_cat_id) DO UPDATE SET (object_name, object_id, epoch, mean_motion, eccentricity, inclination, ra_of_asc_node, 
+                    arg_of_pericenter, mean_anomaly, ephemeris_type, classification_type, element_set_no, rev_at_epoch, 
+                    bstar, mean_motion_dot, mean_motion_ddot) = ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $13, $14, $15, $16, $17)`;
+            const values = Object.values(csvData);
+            return pool.query(query, values);
+        });
+
+        await Promise.all(queryPromises);
+    } catch (error) {
+        console.error(`Failed to fetch data for NORAD IDs: ${error}
+        norad_ids: ${norad_ids}`);
     }
 }
 

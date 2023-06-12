@@ -1,10 +1,3 @@
---
--- PostgreSQL database dump
---
-
--- Dumped from database version 15.3
--- Dumped by pg_dump version 15.3
-
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
@@ -104,7 +97,7 @@ ALTER TABLE public.satcatdata OWNER TO satcatmaster;
 --
 
 CREATE VIEW public.satcat_orbitdata AS
- SELECT satcatdata.object_name AS satcat_object_name,
+ SELECT satcatdata.object_name,
     satcatdata.norad_cat_id,
     satcatdata.object_type,
     country_lookup.country_or_org AS owner,
@@ -161,6 +154,17 @@ CREATE VIEW public.satcatdata_viable AS
 ALTER TABLE public.satcatdata_viable OWNER TO satcatmaster;
 
 --
+-- Name: settings; Type: TABLE; Schema: public; Owner: satcatmaster
+--
+
+CREATE TABLE public.settings (
+    gpt_api_active boolean
+);
+
+
+ALTER TABLE public.settings OWNER TO satcatmaster;
+
+--
 -- Name: no_gp no_gp_pkey; Type: CONSTRAINT; Schema: public; Owner: satcatmaster
 --
 
@@ -185,7 +189,7 @@ ALTER TABLE ONLY public.satcatdata
 
 
 --
--- Name: SCHEMA public; Type: ACL; Schema: -; Owner: pg_database_owner
+-- Name: SCHEMA public; Type: ACL; Schema: -; Owner: postgres
 --
 
 GRANT ALL ON SCHEMA public TO satcatmaster;

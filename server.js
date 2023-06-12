@@ -67,32 +67,16 @@ app.get(['/', '/defaultsite'], (req, res) => {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-// check if table gptswitch contains a true value and set the gptswitch variable accordingly
-let gptswitch = false;
-cron.schedule('*/1 * * * *', () => {
-    pool.query('SELECT * FROM gptswitch', (error, results) => {
-        if (error) {
-            throw error;
-        }
-        if (results.rows[0].gptswitch === true) {
-            gptswitch = true;
-        } else {
-            gptswitch = false;
-        }
-    });
-    // console.log('gptswitch: ' + gptswitch);
-});
-
 const parser = new Parser();
 app.get('/api/search', async (req, res) => {
     try {
-        // const answer = await fetchGPTResponse(req.query.q);
-        // const answer = "SELECT * FROM satcat_orbitdata where satcat_object_name ilike '%ISS (ZAR%'";
-        // const answer = req.query.q;
-        if (gptswitch === true) {
-            const answer = await fetchGPTResponse(req.query.q);
+        let answer;
+        const settingsResult = await pool.query('SELECT gpt_api_active FROM settings');
+        if (settingsResult.rows[0].gpt_api_active === true) {
+            console.log('GPT4 is enabled')
+            answer = await fetchGPTResponse(req.query.q);
         } else {
-            const answer = "SELECT * FROM satcat_orbitdata where satcat_object_name ilike '%ISS (ZAR%'";
+            answer = "SELECT * FROM satcat_orbitdata where satcat_object_name ilike '%ISS (ZAR%'";
         }
         console.log(answer);
         let result;
@@ -148,21 +132,28 @@ cron.schedule('0 0 * * *', async () => {
 });
 
 
-cron.schedule('0 0 * * *', async () => {
-    // keep the orbitdata table up to date
+async function updateOrbitDataTable(pool) {
+    // Keep the orbitdata table up to date
     try {
-        const sqlQuery = "SELECT * FROM satcatdata_viable \
-        WHERE norad_cat_id NOT IN \
-        (SELECT norad_cat_id FROM orbitdata) \
-        AND norad_cat_id NOT IN \
-        (SELECT norad_cat_id FROM no_gp) \
-        LIMIT 1000";
+        await pool.query('BEGIN');
+        const sqlQuery = `
+            SELECT norad_cat_id
+            FROM satcatdata_viable
+            WHERE norad_cat_id NOT IN
+                (SELECT norad_cat_id FROM orbitdata WHERE epoch > (NOW() - INTERVAL '1 day 12 hours'))
+            AND norad_cat_id NOT IN
+                (SELECT norad_cat_id FROM no_gp) limit 500
+        `;
         const result = await pool.query(sqlQuery);
         const norad_ids = result.rows.map(row => row.norad_cat_id);
         await fetchDataForNoradId(norad_ids, pool);
+        await pool.query('COMMIT');
     } catch (err) {
         await pool.query('ROLLBACK');
         console.error(err);
     }
-});
+}
+
+cron.schedule('*/3 3-5 * * *', () => updateOrbitDataTable(pool));
+
 
