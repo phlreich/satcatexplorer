@@ -67,14 +67,33 @@ app.get(['/', '/defaultsite'], (req, res) => {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-
+// check if table gptswitch contains a true value and set the gptswitch variable accordingly
+let gptswitch = false;
+cron.schedule('*/1 * * * *', () => {
+    pool.query('SELECT * FROM gptswitch', (error, results) => {
+        if (error) {
+            throw error;
+        }
+        if (results.rows[0].gptswitch === true) {
+            gptswitch = true;
+        } else {
+            gptswitch = false;
+        }
+    });
+    // console.log('gptswitch: ' + gptswitch);
+});
 
 const parser = new Parser();
 app.get('/api/search', async (req, res) => {
     try {
         // const answer = await fetchGPTResponse(req.query.q);
-        const answer = "SELECT * FROM satcat_orbitdata where satcat_object_name ilike '%ISS (ZAR%'";
+        // const answer = "SELECT * FROM satcat_orbitdata where satcat_object_name ilike '%ISS (ZAR%'";
         // const answer = req.query.q;
+        if (gptswitch === true) {
+            const answer = await fetchGPTResponse(req.query.q);
+        } else {
+            const answer = "SELECT * FROM satcat_orbitdata where satcat_object_name ilike '%ISS (ZAR%'";
+        }
         console.log(answer);
         let result;
         try {
