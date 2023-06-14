@@ -135,7 +135,7 @@ input.addEventListener('blur', function() {
 });
 
 // simulate typing text
-let demoText = "Computer! Display the orbital path of the ISS.";
+let demoText = "Computer! Show me the ten oldest satellites.";
 let textIndex = 0;
 
 function typeText() {
