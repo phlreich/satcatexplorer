@@ -2,16 +2,13 @@ import dotenv from 'dotenv';
 dotenv.config({ path: './config.env' });
 
 import express from 'express';
-import Papa from 'papaparse';
 import cron from 'node-cron';
 import pg from 'pg';
-import nsp from 'node-sql-parser';
 import path from 'path';
 import cors from 'cors';
 
-const { Parser } = nsp;
-
-import { fetchDataForNoradId, fetchGPTResponse } from './helpers.js';
+import { fetchDataForNoradId, fetchGPTResponse,
+         updateSatcatData, updateOrbitDataTable } from './helpers.js';
 
 const { Pool } = pg;
 
@@ -67,21 +64,19 @@ app.get(['/', '/defaultsite'], (req, res) => {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-const parser = new Parser();
 app.get('/api/search', async (req, res) => {
     try {
-        let answer;
+        let sqlQuery;
         const settingsResult = await pool.query('SELECT gpt_api_active FROM settings');
         if (settingsResult.rows[0].gpt_api_active === true) {
-            console.log('GPT4 is enabled')
-            answer = await fetchGPTResponse(req.query.q);
+            sqlQuery = await fetchGPTResponse(req.query.q);
         } else {
-            answer = "SELECT * FROM satcat_orbitdata where satcat_object_name ilike '%ISS (ZAR%'";
+            sqlQuery = "SELECT * FROM satcat_orbitdata where satcat_object_name ilike '%ISS (ZAR%'";
         }
-        console.log(answer);
+        console.log(sqlQuery);
         let result;
         try {
-            result = await pool.query(answer);
+            result = await pool.query(sqlQuery);
             const norad_ids = result.rows.map(row => row.norad_cat_id);
             const orbitDataQuery = 'SELECT * FROM orbitdata WHERE norad_cat_id = ANY($1)';
             const orbitDataResult = await pool.query(orbitDataQuery, [norad_ids]);
@@ -106,54 +101,11 @@ app.get('/api/search', async (req, res) => {
     }
 });
 
+updateSatcatData(pool);
+
 // CRON JOBS
-cron.schedule('0 0 * * *', async () => {
-    console.log('attempting to update satcatdata', new Date());
-    try {
-        const response = await fetch('https://celestrak.com/pub/satcat.csv');
-        const csvData = await response.text();
-        const parsedData = Papa.parse(csvData, { header: true }).data.slice(0, -1);
+cron.schedule('0 0 * * *', () => updateSatcatData(pool));
 
-        await pool.query('TRUNCATE TABLE satcatdata');
-        for (let row of parsedData) {
-            let values = Object.values(row).map(value => value === '' ? null : value);
-            await pool.query(
-                `INSERT INTO satcatdata (
-                    OBJECT_NAME,OBJECT_ID,NORAD_CAT_ID,OBJECT_TYPE,OPS_STATUS_CODE,OWNER,LAUNCH_DATE,LAUNCH_SITE,DECAY_DATE,PERIOD,
-                    INCLINATION,APOGEE,PERIGEE,RCS,DATA_STATUS_CODE,ORBIT_CENTER,ORBIT_TYPE
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
-                values
-            );
-        }
-        console.log('satcatdata updated', new Date());
-    } catch (err) {
-        console.error(err);
-    }
-});
-
-
-async function updateOrbitDataTable(pool) {
-    // Keep the orbitdata table up to date
-    try {
-        await pool.query('BEGIN');
-        const sqlQuery = `
-            SELECT norad_cat_id
-            FROM satcatdata_viable
-            WHERE norad_cat_id NOT IN
-                (SELECT norad_cat_id FROM orbitdata WHERE epoch > (NOW() - INTERVAL '1 day 12 hours'))
-            AND norad_cat_id NOT IN
-                (SELECT norad_cat_id FROM no_gp) limit 500
-        `;
-        const result = await pool.query(sqlQuery);
-        const norad_ids = result.rows.map(row => row.norad_cat_id);
-        await fetchDataForNoradId(norad_ids, pool);
-        await pool.query('COMMIT');
-    } catch (err) {
-        await pool.query('ROLLBACK');
-        console.error(err);
-    }
-}
-
-cron.schedule('*/3 3-5 * * *', () => updateOrbitDataTable(pool));
+cron.schedule('*/4 * * * *', () => updateOrbitDataTable(pool));
 
 

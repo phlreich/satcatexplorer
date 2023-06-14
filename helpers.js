@@ -1,45 +1,30 @@
 import dotenv from 'dotenv';
 dotenv.config({ path: './config.env' });
 
-export { fetchDataForNoradId, fetchGPTResponse };
+export { fetchDataForNoradId, fetchGPTResponse, updateSatcatData, updateOrbitDataTable };
 import Papa from 'papaparse';
 import { Configuration, OpenAIApi } from "openai";
 import fs from 'fs';
 
+const s = [...Array(17)].map((_,i)=>"$"+(i+1)).join(','); // $1,$2,$3,...,$17
+
 async function fetchDataForNoradId(norad_ids, pool) {
     try {
-        const fetchPromises = norad_ids.map(id =>
-            fetch(`https://celestrak.org/NORAD/elements/gp.php?CATNR=${id}&FORMAT=csv`)
-            .catch(error => console.error(`Failed to fetch for NORAD ID ${id}: ${error}`))
-        );
-        const responses = await Promise.all(fetchPromises);
-        const textPromises = responses.map(response => response.text());
-        const texts = await Promise.all(textPromises);
-
-        const queryPromises = texts.map(async (text, index) => {
-            const id = norad_ids[index];
-            if (text.trim() === "No GP data found") {
-                console.error(`No data found for object with NORAD CAT ID: ${id}`);
+        for (const id of norad_ids) {
+            const response = await fetch(`https://celestrak.org/NORAD/elements/gp.php?CATNR=${id}&FORMAT=csv`)
+                .catch(error => console.error(`Failed to fetch for NORAD ID ${id}: ${error}`));
+            const responseText = await response.text();
+            if (responseText.trim() === "No GP data found") {
                 const query = `INSERT INTO no_gp (norad_cat_id, gp_data_available) VALUES ($1, $2)`;
-                const values = [id, false];
-                return pool.query(query, values);
+                await pool.query(query, [id, false]);
             }
-            const csvData = Papa.parse(text, { header: true }).data[0];
-            const query = `INSERT INTO orbitdata (object_name, object_id, epoch, mean_motion, eccentricity, inclination, ra_of_asc_node, 
-                    arg_of_pericenter, mean_anomaly, ephemeris_type, classification_type, norad_cat_id, element_set_no, rev_at_epoch, 
-                    bstar, mean_motion_dot, mean_motion_ddot) 
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) 
-                ON CONFLICT (norad_cat_id) DO UPDATE SET (object_name, object_id, epoch, mean_motion, eccentricity, inclination, ra_of_asc_node, 
-                    arg_of_pericenter, mean_anomaly, ephemeris_type, classification_type, element_set_no, rev_at_epoch, 
-                    bstar, mean_motion_dot, mean_motion_ddot) = ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $13, $14, $15, $16, $17)`;
-            const values = Object.values(csvData);
-            return pool.query(query, values);
-        });
-
-        await Promise.all(queryPromises);
+            const data = Papa.parse(responseText, { header: true }).data.slice(0, -1);
+            const query = `INSERT INTO orbitdata (${Object.keys(data[0])}) VALUES (${s}) 
+                ON CONFLICT (norad_cat_id) DO UPDATE SET (${Object.keys(data[0])}) = (${s})`;
+            await pool.query(query, Object.values(data[0]).map(value => value === '' ? null : value));
+        }
     } catch (error) {
-        console.error(`Failed to fetch data for NORAD IDs: ${error}
-        norad_ids: ${norad_ids}`);
+        console.error(`Failed to fetch data for NORAD IDs: ${error} norad_ids: ${norad_ids}`);
     }
 }
 
@@ -56,10 +41,44 @@ async function fetchGPTResponse(query) {
     const prompt = fs.readFileSync('./prompt.txt', 'utf8');
     let apiquery = prompt + query + "\n\nQueryGPT: ";
     const gptResponse = await openai.createChatCompletion({
-        "model": "gpt-4",
+        "model": "gpt-3.5-turbo",
         "messages": [{"role": "user", "content": apiquery}]
     }
     );
     const answer = gptResponse.data.choices[0].message.content;
     return answer;
+}
+
+const updateSatcatData = async (pool) => {
+    try {
+        const response = await fetch('https://celestrak.com/pub/satcat.csv');
+        const data = Papa.parse(await response.text(), { header: true }).data.slice(0, -1);
+        await pool.query('TRUNCATE TABLE satcatdata');
+        const query = `INSERT INTO satcatdata (${Object.keys(data[0])}) VALUES (${s})`;
+        await Promise.all(data.map(row => 
+            pool.query(query, Object.values(row).map(value => value === '' ? null : value))
+        ));
+    } catch (err) {
+        console.error(err);
+    }
+};
+
+async function updateOrbitDataTable(pool) {
+    try {
+        const sqlQuery = `
+            SELECT norad_cat_id
+            FROM satcatdata_viable
+            WHERE norad_cat_id NOT IN
+                (SELECT norad_cat_id FROM orbitdata 
+                    WHERE epoch > (NOW() - INTERVAL '1 day 12 hours'))
+            AND norad_cat_id NOT IN
+                (SELECT norad_cat_id FROM no_gp) limit 300
+        `;
+        const result = await pool.query(sqlQuery);
+        const norad_ids = result.rows.map(row => row.norad_cat_id);
+        console.log(norad_ids);
+        await fetchDataForNoradId(norad_ids, pool);
+    } catch (err) {
+        console.error(err);
+    }
 }

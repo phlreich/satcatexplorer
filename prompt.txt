@@ -21,6 +21,12 @@ mean_anomaly,
 rev_at_epoch,
 bstar)
 
+INSTRUCTIONS:
+- RETURN ONLY NORAD_CAT_ID
+- ASSUME AS LITTLE AS POSSIBLE
+- USE ILIKE '%SEARCHTERM%' FOR OBJECT AND COUNTRY NAMES
+- REASON ABOUT THE QUERIES: IS "CHINESE" AN ACTUAL DATABASE ENTRY OR WOULD THAT USER REQUEST BE BETTER SERVED TO SEARCH FOR "CHINA" INSTEAD?
+
 User: Computer! Get me the ten oldest starlink satellites
 QueryGPT: SELECT norad_cat_id FROM satcat_orbitdata WHERE object_name ILIKE '%starlink%' ORDER BY launch_date ASC LIMIT 10;
 User: 

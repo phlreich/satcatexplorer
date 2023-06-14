@@ -13,94 +13,70 @@ SET default_tablespace = '';
 
 SET default_table_access_method = heap;
 
---
--- Name: country_lookup; Type: TABLE; Schema: public; Owner: satcatmaster
---
-
-CREATE TABLE public.country_lookup (
-    owner character varying(255),
-    country_or_org character varying(255)
+CREATE TABLE public.owner_lookup (
+    owner VARCHAR(255) PRIMARY KEY,
+    country_or_org VARCHAR(255)
 );
 
-
-ALTER TABLE public.country_lookup OWNER TO satcatmaster;
-
---
--- Name: no_gp; Type: TABLE; Schema: public; Owner: satcatmaster
---
+ALTER TABLE public.owner_lookup OWNER TO satcatmaster;
 
 CREATE TABLE public.no_gp (
-    norad_cat_id integer NOT NULL,
-    gp_data_available boolean
+    norad_cat_id INT PRIMARY KEY,
+    gp_data_available BOOLEAN
 );
-
 
 ALTER TABLE public.no_gp OWNER TO satcatmaster;
 
---
--- Name: orbitdata; Type: TABLE; Schema: public; Owner: satcatmaster
---
-
 CREATE TABLE public.orbitdata (
-    object_name character varying(255),
-    object_id character varying(50),
-    epoch timestamp without time zone,
-    mean_motion double precision,
-    eccentricity double precision,
-    inclination double precision,
-    ra_of_asc_node double precision,
-    arg_of_pericenter double precision,
-    mean_anomaly double precision,
-    ephemeris_type integer,
-    classification_type character(1),
-    norad_cat_id integer NOT NULL,
-    element_set_no integer,
-    rev_at_epoch double precision,
-    bstar double precision,
-    mean_motion_dot double precision,
-    mean_motion_ddot double precision
+    object_name VARCHAR(255),
+    object_id VARCHAR(50),
+    epoch TIMESTAMP,
+    mean_motion REAL,
+    eccentricity REAL,
+    inclination REAL,
+    ra_of_asc_node REAL,
+    arg_of_pericenter REAL,
+    mean_anomaly REAL,
+    ephemeris_type INT,
+    classification_type CHAR(1),
+    norad_cat_id INT PRIMARY KEY,
+    element_set_no INT,
+    rev_at_epoch REAL,
+    bstar REAL,
+    mean_motion_dot REAL,
+    mean_motion_ddot REAL
 );
-
 
 ALTER TABLE public.orbitdata OWNER TO satcatmaster;
 
---
--- Name: satcatdata; Type: TABLE; Schema: public; Owner: satcatmaster
---
-
 CREATE TABLE public.satcatdata (
-    object_name character varying(255),
-    object_id character varying(255),
-    norad_cat_id integer NOT NULL,
-    object_type character varying(10),
-    ops_status_code character varying(10),
-    owner character varying(255),
-    launch_date date,
-    launch_site character varying(255),
-    decay_date date,
-    period double precision,
-    inclination double precision,
-    apogee double precision,
-    perigee double precision,
-    rcs double precision,
-    data_status_code character varying(10),
-    orbit_center character varying(50),
-    docked_norad_cat_id integer,
-    orbit_type character varying(10)
+    object_name VARCHAR(255),
+    object_id VARCHAR(255),
+    norad_cat_id INT PRIMARY KEY,
+    object_type VARCHAR(10),
+    ops_status_code VARCHAR(10),
+    owner VARCHAR(255),
+    launch_date DATE,
+    launch_site VARCHAR(255),
+    decay_date DATE,
+    period REAL,
+    inclination REAL,
+    apogee REAL,
+    perigee REAL,
+    rcs REAL,
+    data_status_code VARCHAR(10),
+    orbit_center VARCHAR(50),
+    docked_norad_cat_id INT,
+    orbit_type VARCHAR(10)
 );
 
-
 ALTER TABLE public.satcatdata OWNER TO satcatmaster;
-
---
--- Name: satcat_orbitdata; Type: VIEW; Schema: public; Owner: satcatmaster
---
 
 CREATE VIEW public.satcat_orbitdata AS
  SELECT satcatdata.object_name,
     satcatdata.norad_cat_id,
     satcatdata.object_type,
-    country_lookup.country_or_org AS owner,
+    owner_lookup.country_or_org AS owner,
     satcatdata.launch_date,
     satcatdata.launch_site,
     satcatdata.period,
@@ -118,14 +94,9 @@ CREATE VIEW public.satcat_orbitdata AS
     orbitdata.bstar
    FROM ((public.satcatdata
      JOIN public.orbitdata ON ((satcatdata.norad_cat_id = orbitdata.norad_cat_id)))
-     LEFT JOIN public.country_lookup ON (((satcatdata.owner)::text = (country_lookup.owner)::text)));
-
+     LEFT JOIN public.owner_lookup ON (((satcatdata.owner)::TEXT = (owner_lookup.owner)::TEXT)));
 
 ALTER TABLE public.satcat_orbitdata OWNER TO satcatmaster;
-
---
--- Name: satcatdata_viable; Type: VIEW; Schema: public; Owner: satcatmaster
---
 
 CREATE VIEW public.satcatdata_viable AS
  SELECT satcatdata.object_name,
@@ -147,84 +118,24 @@ CREATE VIEW public.satcatdata_viable AS
     satcatdata.docked_norad_cat_id,
     satcatdata.orbit_type
    FROM public.satcatdata
-  WHERE (((satcatdata.orbit_type)::text = 'ORB'::text) AND (satcatdata.data_status_code IS NULL) AND ((satcatdata.orbit_center)::text = 'EA'::text) AND (NOT (satcatdata.norad_cat_id IN ( SELECT no_gp.norad_cat_id
+  WHERE (((satcatdata.orbit_type)::TEXT = 'ORB'::TEXT) AND (satcatdata.data_status_code IS NULL) AND ((satcatdata.orbit_center)::TEXT = 'EA'::TEXT) AND (NOT (satcatdata.norad_cat_id IN ( SELECT no_gp.norad_cat_id
            FROM public.no_gp))));
-
 
 ALTER TABLE public.satcatdata_viable OWNER TO satcatmaster;
 
---
--- Name: settings; Type: TABLE; Schema: public; Owner: satcatmaster
---
-
 CREATE TABLE public.settings (
-    gpt_api_active boolean
+    gpt_api_active BOOLEAN
 );
-
 
 ALTER TABLE public.settings OWNER TO satcatmaster;
 
---
--- Name: no_gp no_gp_pkey; Type: CONSTRAINT; Schema: public; Owner: satcatmaster
---
-
-ALTER TABLE ONLY public.no_gp
-    ADD CONSTRAINT no_gp_pkey PRIMARY KEY (norad_cat_id);
-
-
---
--- Name: orbitdata orbitdata_pkey; Type: CONSTRAINT; Schema: public; Owner: satcatmaster
---
-
-ALTER TABLE ONLY public.orbitdata
-    ADD CONSTRAINT orbitdata_pkey PRIMARY KEY (norad_cat_id);
-
-
---
--- Name: satcatdata satcatdata_pkey; Type: CONSTRAINT; Schema: public; Owner: satcatmaster
---
-
-ALTER TABLE ONLY public.satcatdata
-    ADD CONSTRAINT satcatdata_pkey PRIMARY KEY (norad_cat_id);
-
-
---
--- Name: SCHEMA public; Type: ACL; Schema: -; Owner: postgres
---
-
 GRANT ALL ON SCHEMA public TO satcatmaster;
-
-
---
--- Name: TABLE no_gp; Type: ACL; Schema: public; Owner: satcatmaster
---
 
 GRANT SELECT ON TABLE public.no_gp TO satcatuser;
 
-
---
--- Name: TABLE orbitdata; Type: ACL; Schema: public; Owner: satcatmaster
---
-
 GRANT SELECT ON TABLE public.orbitdata TO satcatuser;
 
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO satcatmaster;
 
---
--- Name: DEFAULT PRIVILEGES FOR SEQUENCES; Type: DEFAULT ACL; Schema: public; Owner: postgres
---
-
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES  TO satcatmaster;
-
-
---
--- Name: DEFAULT PRIVILEGES FOR TABLES; Type: DEFAULT ACL; Schema: public; Owner: postgres
---
-
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT SELECT ON TABLES  TO satcatuser;
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES  TO satcatmaster;
-
-
---
--- PostgreSQL database dump complete
---
-
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT SELECT ON TABLES TO satcatuser;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO satcatmaster;
