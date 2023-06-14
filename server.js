@@ -106,6 +106,6 @@ updateSatcatData(pool);
 // CRON JOBS
 cron.schedule('0 0 * * *', () => updateSatcatData(pool));
 
-cron.schedule('*/4 * * * *', () => updateOrbitDataTable(pool));
+cron.schedule('*/5 * * * *', () => updateOrbitDataTable(pool));
 
 

@@ -9,7 +9,6 @@ import fs from 'fs';
 const s = [...Array(17)].map((_,i)=>"$"+(i+1)).join(','); // $1,$2,$3,...,$17
 
 async function fetchDataForNoradId(norad_ids, pool) {
-
     for (const id of norad_ids) {
         try {
             const response = await fetch(`https://celestrak.org/NORAD/elements/gp.php?CATNR=${id}&FORMAT=csv`)
@@ -18,11 +17,12 @@ async function fetchDataForNoradId(norad_ids, pool) {
             if (responseText.trim() === "No GP data found") {
                 const query = `INSERT INTO no_gp (norad_cat_id, gp_data_available) VALUES ($1, $2)`;
                 await pool.query(query, [id, false]);
+            } else {
+                const data = Papa.parse(responseText, { header: true }).data.slice(0, -1);
+                const query = `INSERT INTO orbitdata (${Object.keys(data[0])}) VALUES (${s}) 
+                    ON CONFLICT (norad_cat_id) DO UPDATE SET (${Object.keys(data[0])}) = (${s})`;
+                await pool.query(query, Object.values(data[0]).map(value => value === '' ? null : value));
             }
-            const data = Papa.parse(responseText, { header: true }).data.slice(0, -1);
-            const query = `INSERT INTO orbitdata (${Object.keys(data[0])}) VALUES (${s}) 
-                ON CONFLICT (norad_cat_id) DO UPDATE SET (${Object.keys(data[0])}) = (${s})`;
-            await pool.query(query, Object.values(data[0]).map(value => value === '' ? null : value));
         } catch (err) {
             console.error(err, `update orbitdata operation on NORAD ID ${id}`);
         }
