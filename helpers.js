@@ -22,6 +22,7 @@ async function fetchDataForNoradId(norad_ids, pool) {
                 const query = `INSERT INTO orbitdata (${Object.keys(data[0])}) VALUES (${s}) 
                     ON CONFLICT (norad_cat_id) DO UPDATE SET (${Object.keys(data[0])}) = (${s})`;
                 await pool.query(query, Object.values(data[0]).map(value => value === '' ? null : value));
+                await pool.query(`INSERT INTO orbitdata_last_updated VALUES ($1, $2) ON CONFLICT (norad_cat_id) DO UPDATE SET last_update = $2`, [id, new Date()]);
             }
         } catch (err) {
             console.error(err, `update orbitdata operation on NORAD ID ${id}`);
@@ -70,10 +71,10 @@ async function updateOrbitDataTable(pool) {
             SELECT norad_cat_id
             FROM satcatdata_viable
             WHERE norad_cat_id NOT IN
-                (SELECT norad_cat_id FROM orbitdata 
-                    WHERE epoch > (NOW() - INTERVAL '1 day 12 hours'))
+                (SELECT norad_cat_id FROM orbitdata_last_updated
+                    WHERE last_update > (NOW() - INTERVAL '3 days'))
             AND norad_cat_id NOT IN
-                (SELECT norad_cat_id FROM no_gp) limit 300
+                (SELECT norad_cat_id FROM no_gp) limit 200
         `;
         const result = await pool.query(sqlQuery);
         const norad_ids = result.rows.map(row => row.norad_cat_id);
