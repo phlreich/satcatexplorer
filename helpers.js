@@ -9,8 +9,9 @@ import fs from 'fs';
 const s = [...Array(17)].map((_,i)=>"$"+(i+1)).join(','); // $1,$2,$3,...,$17
 
 async function fetchDataForNoradId(norad_ids, pool) {
-    try {
-        for (const id of norad_ids) {
+
+    for (const id of norad_ids) {
+        try {
             const response = await fetch(`https://celestrak.org/NORAD/elements/gp.php?CATNR=${id}&FORMAT=csv`)
                 .catch(error => console.error(`Failed to fetch for NORAD ID ${id}: ${error}`));
             const responseText = await response.text();
@@ -22,9 +23,9 @@ async function fetchDataForNoradId(norad_ids, pool) {
             const query = `INSERT INTO orbitdata (${Object.keys(data[0])}) VALUES (${s}) 
                 ON CONFLICT (norad_cat_id) DO UPDATE SET (${Object.keys(data[0])}) = (${s})`;
             await pool.query(query, Object.values(data[0]).map(value => value === '' ? null : value));
+        } catch (err) {
+            console.error(err, `update orbitdata operation on NORAD ID ${id}`);
         }
-    } catch (error) {
-        console.error(`Failed to fetch data for NORAD IDs: ${error} norad_ids: ${norad_ids}`);
     }
 }
 
