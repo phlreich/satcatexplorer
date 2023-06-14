@@ -21,13 +21,20 @@ if (process.platform === "linux") {
 const __dirname = path.dirname(__filename);
 
 const pool = new Pool({
-    user: process.env.DB_USER,
+    user: process.env.DB_MASTER_USER,
     host: process.env.DB_HOST,
     database: process.env.DB_DATABASE,
-    password: process.env.DB_PASSWORD,
+    password: process.env.DB_MASTER_PASSWORD,
     port: process.env.DB_PORT,
 });
 
+const userpool = new Pool({
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: DB_DATABASE,
+    password: process.env.DB_PASSWORD,
+    port: process.env.DB_PORT,
+});
 
 // test connection
 pool.query('SELECT NOW()', (error, results) => {
@@ -76,7 +83,7 @@ app.get('/api/search', async (req, res) => {
         console.log(sqlQuery);
         let result;
         try {
-            result = await pool.query(sqlQuery);
+            result = await userpool.query(sqlQuery);
             const norad_ids = result.rows.map(row => row.norad_cat_id);
             const orbitDataQuery = 'SELECT * FROM orbitdata WHERE norad_cat_id = ANY($1)';
             const orbitDataResult = await pool.query(orbitDataQuery, [norad_ids]);
