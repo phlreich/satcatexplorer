@@ -78,7 +78,6 @@ async function updateOrbitDataTable(pool) {
         `;
         const result = await pool.query(sqlQuery);
         const norad_ids = result.rows.map(row => row.norad_cat_id);
-        console.log(norad_ids);
         await fetchDataForNoradId(norad_ids, pool);
     } catch (err) {
         console.error(err);
